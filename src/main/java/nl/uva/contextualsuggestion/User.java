@@ -9,7 +9,6 @@ package nl.uva.contextualsuggestion;
 import java.io.IOException;
 import java.util.HashSet;
 import nl.uva.lm.LanguageModel;
-import nl.uva.lm.MixtureLM;
 
 /**
  *
@@ -43,6 +42,10 @@ public class User {
         Double sumPR =0D;
         Double sumNR =0D;
         for(Prefrence p : this.ratedPrefrences){
+           
+            if(p.rate == -1 || p.rate == 2)
+                continue;
+            
             if(p.rate > 2){
                 if(p.rate == 4.0)
                     p.setNewRate(2.0);
@@ -51,6 +54,7 @@ public class User {
                 positivePrefrences.add(p);
                 sumPR += p.rate;
             }
+            
             else if(p.rate < 2){
                 if(p.rate == 0.0)
                     p.setNewRate(2.0);

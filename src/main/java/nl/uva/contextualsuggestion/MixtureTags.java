@@ -6,22 +6,12 @@
 package nl.uva.contextualsuggestion;
 
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map.Entry;
 import nl.uva.lm.LanguageModel;
-import nl.uva.lm.CollectionSLM;
 import nl.uva.lm.MixtureLM;
-import nl.uva.lm.ParsimoniousLM;
-import nl.uva.lm.StandardLM;
-import nl.uva.lucenefacility.IndexInfo;
-import static nl.uva.settings.Config.configFile;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.store.FSDirectory;
 
 /**
  *

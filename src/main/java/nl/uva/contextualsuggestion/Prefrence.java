@@ -14,19 +14,19 @@ import nl.uva.lm.LanguageModel;
  *
  * @author Mostafa Dehghani
  */
-public class Suggestion {
-    private static final org.apache.log4j.Logger log = org.apache.log4j.Logger.getLogger(Suggestion.class.getName());
+public class Prefrence {
+    private static final org.apache.log4j.Logger log = org.apache.log4j.Logger.getLogger(Prefrence.class.getName());
     public String docID;
-    public Integer rate;
+    public Double rate;
     public HashSet<String> tags;
     public LanguageModel docSLM;
 
-    public Suggestion(String docID, Integer rate) {
+    public Prefrence(String docID, Double rate) {
         this.docID = docID;
         this.rate = rate;
     }
 
-    public Suggestion(String docID, Integer rate, HashSet<String> tags) {
+    public Prefrence(String docID, Double rate, HashSet<String> tags) {
         this.docID = docID;
         this.rate = rate;
         this.tags = tags;
@@ -47,11 +47,15 @@ public class Suggestion {
         if (getClass() != obj.getClass()) {
             return false;
         }
-        final Suggestion other = (Suggestion) obj;
+        final Prefrence other = (Prefrence) obj;
         if (!Objects.equals(this.docID, other.docID)) {
             return false;
         }
         return true;
+    }
+    
+    public void setNewRate(Double newRate){
+        this.rate = newRate;
     }
 
     

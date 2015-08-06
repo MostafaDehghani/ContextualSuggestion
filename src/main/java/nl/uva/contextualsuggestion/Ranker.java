@@ -8,9 +8,12 @@ package nl.uva.contextualsuggestion;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -21,13 +24,14 @@ import nl.uva.lm.CollectionSLM;
 import nl.uva.lm.Divergence;
 import nl.uva.lm.LanguageModel;
 import static nl.uva.lm.LanguageModel.sortByValues;
-import nl.uva.lm.SmoothedLM;
 import nl.uva.lm.StandardLM;
 import nl.uva.lucenefacility.IndexInfo;
 import static nl.uva.settings.Config.configFile;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.store.FSDirectory;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
 
 /**
  *
@@ -36,20 +40,47 @@ import org.apache.lucene.store.FSDirectory;
 public class Ranker {
 
     private static final org.apache.log4j.Logger log = org.apache.log4j.Logger.getLogger(Ranker.class.getName());
+    private String indexPathString;
+    private Path ipath;
+    private IndexReader ireader;
+    private IndexInfo iInfo;
+
+    public Ranker() throws IOException {
+        indexPathString = configFile.getProperty("INDEX_PATH");
+        ipath = FileSystems.getDefault().getPath(indexPathString);
+        ireader = DirectoryReader.open(FSDirectory.open(ipath));
+        iInfo = new IndexInfo(ireader);
+    }
 
     public User GetUserInfo(String Line) throws FileNotFoundException, IOException {
 
         UserInfo ui = new UserInfo(Line);
         String uId = ui.getProfileID();
-        HashSet<String> suggestioncandidates = ui.getSuggestionCandidates();
+        JsonArray jarray1 = ui.getSuggestionCandidates();
+        HashSet<String> suggestionCandidatesArray = new HashSet<>();
+        for (int i = 0; i < jarray1.size(); i++) {
+            String docID =jarray1.get(i).toString().replaceAll("\"", "").trim();
+            //Filter non-crowled Docs
+            if (iInfo.getIndexId(docID) == null){
+//                System.out.println(docID);
+                continue;
+            }
+            suggestionCandidatesArray.add(docID);
+        }
+        
         HashSet<Prefrence> Prefrences = new HashSet<>();
-
-        JsonArray jarray = ui.getPreferences();
-        for (int i = 0; i < jarray.size(); i++) {
+        JsonArray jarray2 = ui.getPreferences();
+        for (int i = 0; i < jarray2.size(); i++) {
             Double rating = null;
-            JsonObject jobjectIterator = jarray.get(i).getAsJsonObject();
+            JsonObject jobjectIterator = jarray2.get(i).getAsJsonObject();
             String docID = jobjectIterator.get("documentId").toString().replaceAll("\"", "").trim();
-
+            
+            //Filter non-crowled Docs
+            if (iInfo.getIndexId(docID) == null){
+//                System.out.println(docID);
+                continue;
+            }
+                
             if (jobjectIterator.get("rating") != null) {
                 rating = Double.parseDouble(jobjectIterator.get("rating").toString());
             } else {
@@ -60,26 +91,26 @@ public class Ranker {
             if (jobjectIterator.getAsJsonArray("tags") == null) {
                 pr = new Prefrence(docID, rating);
             } else {
-                JsonArray jarray2 = jobjectIterator.getAsJsonArray("tags");
+                JsonArray jarray3 = jobjectIterator.getAsJsonArray("tags");
                 HashSet<String> tags = new HashSet<>();
-                for (int j = 0; j < jarray2.size(); j++) {
-                    tags.add(jarray2.get(j).toString());
+                for (int j = 0; j < jarray3.size(); j++) {
+                    tags.add(jarray3.get(j).toString());
                 }
                 pr = new Prefrence(docID, rating, tags);
             }
             Prefrences.add(pr);
         }
-        User user = new User(uId, Prefrences, suggestioncandidates);
+        User user = new User(uId, Prefrences, suggestionCandidatesArray);
         return user;
     }
 
     public void main() throws FileNotFoundException, IOException {
 
         String field = "TEXT";
-        String indexPathString = configFile.getProperty("INDEX_PATH");
-        Path ipath = FileSystems.getDefault().getPath(indexPathString);
-        IndexReader ireader = DirectoryReader.open(FSDirectory.open(ipath));
-        IndexInfo iInfo = new IndexInfo(ireader);
+        indexPathString = configFile.getProperty("INDEX_PATH");
+        ipath = FileSystems.getDefault().getPath(indexPathString);
+        ireader = DirectoryReader.open(FSDirectory.open(ipath));
+        iInfo = new IndexInfo(ireader);
         CollectionSLM CLM = new CollectionSLM(ireader, field);
 
         String inputProfiles = configFile.getProperty("USERS");
@@ -87,25 +118,69 @@ public class Ranker {
         BufferedReader br = new BufferedReader(new FileReader(inputProfiles));
         while ((line = br.readLine()) != null) {
             User user = this.GetUserInfo(line);
-            HashMap<String,Double> scores = new HashMap<>();
+            HashMap<String, Double> scores = new HashMap<>();
             for (String candidate : user.suggestionCandidates) {
                 Integer indexId = iInfo.getIndexId(candidate);
                 LanguageModel candidateSLM = new StandardLM(ireader, indexId, field);
-                SmoothedLM candidateSLM_smoothed = new SmoothedLM(candidateSLM,CLM);
-                SmoothedLM PM_PLMsmoothed  = new SmoothedLM(user.userPositiveMixturePLM,CLM);
-                SmoothedLM NM_PLMsmoothed  = new SmoothedLM(user.userNegativeMixturePLM,CLM);
-                SmoothedLM PT_PLMsmoothed  = new SmoothedLM(user.userPositiveMixtureTags,CLM);
-                SmoothedLM NT_PLMsmoothed  = new SmoothedLM(user.userNegativeMixtureTags,CLM);
-                Divergence div = new Divergence();
-                Double score1 = div.JsdScore(candidateSLM_smoothed, PM_PLMsmoothed);
-                Double score2 = div.JsdScore(candidateSLM_smoothed, NM_PLMsmoothed);
-                Double score3 = div.JsdScore(candidateSLM_smoothed, PT_PLMsmoothed);
-                Double score4 = div.JsdScore(candidateSLM_smoothed, NT_PLMsmoothed);
+//                SmoothedLM candidateSLM_smoothed = new SmoothedLM(candidateSLM, CLM);
+//                SmoothedLM PM_PLMsmoothed = new SmoothedLM(user.userPositiveMixturePLM, CLM);
+//                SmoothedLM NM_PLMsmoothed = new SmoothedLM(user.userNegativeMixturePLM, CLM);
+//                SmoothedLM PT_PLMsmoothed = new SmoothedLM(user.userPositiveMixtureTags, CLM);
+//                SmoothedLM NT_PLMsmoothed = new SmoothedLM(user.userNegativeMixtureTags, CLM);
+//                Divergence div = new Divergence();
+//                Double score1 = div.JsdScore(candidateSLM_smoothed, PM_PLMsmoothed);
+//                Double score2 = div.JsdScore(candidateSLM_smoothed, NM_PLMsmoothed);
+//                Double score3 = div.JsdScore(candidateSLM_smoothed, PT_PLMsmoothed);
+//                Double score4 = div.JsdScore(candidateSLM_smoothed, NT_PLMsmoothed);
+                
+                Divergence div1 = new Divergence(candidateSLM, user.userPositiveMixturePLM);
+                Double score1 = div1.getJsdSimScore();
+                Divergence div2 = new Divergence(candidateSLM, user.userNegativeMixturePLM);
+                Double score2 = div2.getJsdSimScore();
+                Divergence div3 = new Divergence(candidateSLM, user.userPositiveMixtureTags);
+                Double score3 = div3.getJsdSimScore();
+                Divergence div4 = new Divergence(candidateSLM, user.userNegativeMixtureTags);
+                Double score4 = div4.getJsdSimScore();
                 Double FinalScore = score1 - score2 + score3 - score4;
                 scores.put(candidate, FinalScore);
             }
             List<Map.Entry<String, Double>> sortedCandidates = sortByValues(scores, false);
+            System.out.println("User: " + user.uId);
+//            System.out.println(sortedCandidates.toString());
+            this.OutputGenerator(user.uId, sortedCandidates);
+            this.OutputGenerator_trecEval(user.uId, sortedCandidates);
         }
+        
+    }
+    
+    private void OutputGenerator(String uId, List<Map.Entry<String, Double>> sortedCandidates) throws IOException{
+        JSONObject obj = new JSONObject();
+        JSONObject body = new JSONObject();
+            JSONArray suggestions = new JSONArray();
+            for(Map.Entry<String, Double> e : sortedCandidates){
+                suggestions.add(e.getKey());
+            }
+	body.put("suggestions", suggestions);
+        obj.put("body", body);
+	obj.put("groupid", "UvA");
+	obj.put("id", new Integer(uId));
+	obj.put("runid", "runid");
+        PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("response.txt", true)));
+        out.println(obj);
+        out.close();
+//        System.out.print(obj);
+    }
+    
+    private void OutputGenerator_trecEval(String uId, List<Map.Entry<String, Double>> sortedCandidates) throws IOException{
+        //query-number    Q0  document-id rank    score   Exp
+        PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter("response-treceval.txt", true)));
+        Integer rank = 1;
+        for(Map.Entry<String, Double> e : sortedCandidates){
+                String line = uId + " Q0 " + e.getKey() + " " + rank + " " + e.getValue();
+                out.println(line);
+                rank++;
+        }
+        out.close();
     }
 
     public static void main(String[] args) throws IOException {

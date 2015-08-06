@@ -25,12 +25,16 @@ public final class MixtureTags extends LanguageModel {
         HashSet<Entry<Double,LanguageModel>> prob_pref = new HashSet<>();
         for(Prefrence p:ps){
             Double prob = p.rate / rateSum;
-            Integer numOfAllTags = p.tags.size();
-            HashMap<String,Double> lm = new HashMap<>();
-            for(String t: p.tags){
-                lm.put(t, 1.0 / numOfAllTags);
+            LanguageModel TagSLM = new LanguageModel();
+            //Skip doc without tags:
+            if(p.tags!=null){
+                Integer numOfAllTags = p.tags.size();
+                HashMap<String,Double> lm = new HashMap<>();
+                for(String t: p.tags){
+                    lm.put(t, 1.0 / numOfAllTags);
+                }
+                TagSLM = new LanguageModel(lm);
             }
-            LanguageModel TagSLM = new LanguageModel(lm);
             Entry<Double,LanguageModel> e = new AbstractMap.SimpleEntry(prob,TagSLM);
             prob_pref.add(e);
         }

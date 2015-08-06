@@ -4,7 +4,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.util.HashSet;
 
 public class UserInfo {
 
@@ -14,15 +13,12 @@ public class UserInfo {
         this.profileJson = profileJson;
     }
 
-    public HashSet<String> getSuggestionCandidates() {
+    public JsonArray getSuggestionCandidates() {
         JsonElement jelement = new JsonParser().parse(profileJson);
         JsonObject jobject = jelement.getAsJsonObject();
         JsonArray jarray = jobject.getAsJsonArray("candidates");
-        HashSet<String> suggestionCandidatesArray = new HashSet<>();
-        for (int i = 0; i < jarray.size(); i++) {
-            suggestionCandidatesArray.add(jarray.get(i).toString().replaceAll("\"", "").trim());
-        }
-        return suggestionCandidatesArray;
+        return jarray;
+       
     }
 
     public JsonArray getPreferences() {

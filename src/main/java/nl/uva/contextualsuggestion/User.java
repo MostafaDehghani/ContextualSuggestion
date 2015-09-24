@@ -19,6 +19,7 @@ public class User {
     
     public Integer nuteralRate = 2;
     public String uId;
+    public String reqId;
     public HashSet<Prefrence> ratedPrefrences;
     public HashSet<String> suggestionCandidates;
     
@@ -28,7 +29,8 @@ public class User {
     public LanguageModel userPositiveMixtureTags;
     public LanguageModel userNegativeMixtureTags; 
 
-    public User(String uId, HashSet<Prefrence> ratedPrefrences, HashSet<String> suggestionCandidates) throws IOException {
+    public User(String reqId,String uId, HashSet<Prefrence> ratedPrefrences, HashSet<String> suggestionCandidates) throws IOException {
+        this.reqId = reqId;
         this.uId = uId;
         this.ratedPrefrences = ratedPrefrences;
         this.suggestionCandidates = suggestionCandidates;

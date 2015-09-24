@@ -42,4 +42,13 @@ public class UserInfo {
 
         return profileID;
     }
+
+    String getRequestID() {
+        String requestID = "";
+        JsonElement jelement = new JsonParser().parse(profileJson);
+        JsonObject jobject = jelement.getAsJsonObject();
+        requestID = jobject.get("id").toString();
+
+        return requestID;
+    }
 }
